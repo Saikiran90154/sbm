@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Deed Team Map with Hover Details</title>
+<style>
+  * {
+    box-sizing: border-box;
+  }
+  body, html {
+    margin: 0; padding: 0;
+    height: 100%;
+    background: #121212;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    color: white;
+    overflow: hidden;
+  }
+  #map {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    padding: 20px 40px;
+    background: #121212;
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    grid-template-rows: repeat(4, 1fr);
+    gap: 30px;
+    user-select: none;
+  }
+  .building {
+    position: relative;
+    background: #222222;
+    border-radius: 6px;
+    filter: drop-shadow(4px 4px 8px #0008);
+    box-shadow:
+      inset 0 4px 5px #3e3e3e,
+      inset 0 -4px 5px #121212;
+  }
+  .building.small { height: 80px; }
+  .building.medium { height: 110px; }
+  .building.large { height: 140px; }
+
+  .marker {
+    position: absolute;
+    width: 46px;
+    height: 58px;
+    cursor: pointer;
+    transform: translate(-50%, -100%);
+    z-index: 10;
+  }
+  .marker-pin {
+    position: relative;
+    width: 34px;
+    height: 42px;
+    background: #444444;
+    border-radius: 50% 50% 50% 0;
+    box-shadow: 0 0 6px #000c inset;
+    transform: rotate(-45deg);
+    overflow: hidden;
+    border: 3px solid #666666;
+    transition: border-color 0.3s, box-shadow 0.3s;
+  }
+  .marker.active .marker-pin {
+    border-color: #E3F000;
+    box-shadow: 0 0 8px #E3F000, 0 0 10px #E3F000 inset;
+  }
+  .marker img {
+    position: absolute;
+    top: 3px; left: 50%;
+    width: 34px; height: 34px;
+    border-radius: 50%;
+    object-fit: cover;
+    transform: translate(-50%, 10%) rotate(45deg);
+    filter: grayscale(0.3);
+    transition: filter 0.3s;
+  }
+  .marker.active img {
+    filter: grayscale(0);
+  }
+
+  #deed-team {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 140px;
+    height: 70px;
+    transform: translate(-50%, -50%);
+    background: #21b661;
+    width: 180px;
+    margin: auto;
+    height: 1;
+
+    border-radius: 8px;
+    box-shadow: 0 2px 12px #000000bb;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    font-weight: 700;
+    font-style: italic;
+    font-size: 28px;
+    color: white;
+    user-select: none;
+    z-index: 15;
+  }
+  #deed-team span { font-style: normal;font-weight: 1100; font-size: 22px; }
+  #deed-team small { font-style: normal; font-weight: 900; font-size: 18px; margin-top: -6px; }
+
+  svg {
+    position: absolute;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    top: 0;
+    left: 0;
+    z-index: 5;
+  }
+  .path {
+    stroke-linecap: round;
+    stroke-width: 12;
+    stroke: #66666688;
+    transition: stroke 0.3s, stroke-width 0.3s;
+  }
+  .path.active {
+    stroke: #E3F000;
+    stroke-width: 16;
+  }
+
+  #profile-card {
+    position: absolute;
+    max-width: 280px;
+    background: white;
+    color: #121212;
+    border-radius: 14px;
+    padding: 18px 24px;
+    box-shadow: 0 6px 15px #00000044;
+    font-size: 14px;
+    line-height: 1.4;
+    user-select: text;
+    z-index: 20;
+    cursor: default;
+    display: none;
+    pointer-events: none; /* to prevent blocking hover events on markers */
+  }
+  #profile-card .role-tag {
+    display: inline-block;
+    font-weight: 700;
+    background: #E3F000;
+    color: #121212;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    margin-bottom: 8px;
+  }
+  #profile-card h3 {
+    margin: 2px 0 8px 0;
+    font-weight: 700;
+    font-size: 18px;
+  }
+  #profile-card .email {
+    font-weight: 600;
+    font-size: 12px;
+    margin-bottom: 10px;
+    color: #666666;
+  }
+  #profile-card hr {
+    border: none;
+    border-top: 1px solid #ddd;
+    margin: 8px 0 12px 0;
+  }
+</style>
+</head>
+<body>
+<div id="map">
+  <!-- Buildings grid -->
+  <div class="building medium" style="grid-column:1/span1; grid-row:1/span1;"></div>
+  <div class="building small" style="grid-column:2/span1; grid-row:1/span1;"></div>
+  <div class="building large" style="grid-column:3/span1; grid-row:1/span1;"></div>
+  <div class="building medium" style="grid-column:4/span1; grid-row:1/span1;"></div>
+  <div class="building medium" style="grid-column:5/span1; grid-row:1/span1;"></div>
+  <div class="building small" style="grid-column:6/span1; grid-row:1/span1;"></div>
+  <div class="building medium" style="grid-column:7/span1; grid-row:1/span1;"></div>
+  <div class="building small" style="grid-column:8/span1; grid-row:1/span1;"></div>
+
+  <div class="building large" style="grid-column:1/span1; grid-row:2/span1;"></div>
+  <div class="building small" style="grid-column:2/span1; grid-row:2/span1;"></div>
+  <div class="building medium" style="grid-column:3/span1; grid-row:2/span1;"></div>
+  <div class="building medium" style="grid-column:4/span1; grid-row:2/span1;"></div>
+  <div class="building small" style="grid-column:5/span1; grid-row:2/span1;"></div>
+  <div class="building medium" style="grid-column:6/span1; grid-row:2/span1;"></div>
+  <div class="building medium" style="grid-column:7/span1; grid-row:2/span1;"></div>
+  <div class="building small" style="grid-column:8/span1; grid-row:2/span1;"></div>
+
+  <div class="building small" style="grid-column:1/span1; grid-row:3/span1;"></div>
+  <div class="building large" style="grid-column:2/span1; grid-row:3/span1;"></div>
+  <div class="building medium" style="grid-column:3/span1; grid-row:3/span1;"></div>
+  <div class="building large" style="grid-column:4/span1; grid-row:3/span1;"></div>
+  <div class="building small" style="grid-column:5/span1; grid-row:3/span1;"></div>
+  <div class="building medium" style="grid-column:6/span1; grid-row:3/span1;"></div>
+  <div class="building small" style="grid-column:7/span1; grid-row:3/span1;"></div>
+  <div class="building medium" style="grid-column:8/span1; grid-row:3/span1;"></div>
+
+  <div class="building medium" style="grid-column:1/span1; grid-row:4/span1;"></div>
+  <div class="building small" style="grid-column:2/span1; grid-row:4/span1;"></div>
+  <div class="building medium" style="grid-column:3/span1; grid-row:4/span1;"></div>
+  <div class="building medium" style="grid-column:4/span1; grid-row:4/span1;"></div>
+  <div class="building small" style="grid-column:5/span1; grid-row:4/span1;"></div>
+  <div class="building large" style="grid-column:6/span1; grid-row:4/span1;"></div>
+  <div class="building medium" style="grid-column:7/span1; grid-row:4/span1;"></div>
+  <div class="building small" style="grid-column:8/span1; grid-row:4/span1;"></div>
+
+  <div id="deed-team">
+    <span>SCHOOLBUS</span>
+    <small>TEAM</small>
+  </div>
+
+  <!-- Markers -->
+  <div class="marker" data-id="1" style="top: 15%; left: 12%;">
+    <div class="marker-pin"><img src="1.jpg" alt="Þorvaldur Skúli Skúlason" /></div>
+  </div>
+  <div class="marker" data-id="2" style="top: 25%; left: 70%;">
+    <div class="marker-pin"><img src="2.jpg" alt="Anna Smith" /></div>
+  </div>
+  <div class="marker" data-id="3" style="top: 50%; left: 20%;">
+    <div class="marker-pin"><img src="3.jpg" alt="John Lee" /></div>
+  </div>
+  <div class="marker" data-id="4" style="top: 60%; left: 80%;">
+    <div class="marker-pin"><img src="4.jpg" alt="Emily Davis" /></div>
+  </div>
+
+
+  <!-- SVG for paths -->
+  <svg>
+    <path id="path-1" class="path" />
+    <path id="path-2" class="path" />
+    <path id="path-3" class="path" />
+    <path id="path-4" class="path" />
+  
+  </svg>
+</div>
+
+<div id="profile-card" role="dialog" aria-live="polite" aria-atomic="true">
+  <div class="role-tag" id="card-role"></div>
+  <h3 id="card-name"></h3>
+  <p class="email" id="card-email"></p>
+  <hr />
+  <p id="card-bio"></p>
+</div>
+
+<script>
+  const members = {
+    1: {
+      role: "CEO",
+      name: "Þorvaldur Skúli Skúlason",
+      email: "thorvaldur@deeddelivery.com",
+      bio: "Þorvaldur has a BSc in Economics from the University of Iceland. Prior to joining the Deed team he was a project manager at UPS Iceland. As well as having successfully managed his own Landscaping Business.",
+      color: "#E3F000",
+    },
+    2: {
+      role: "Engineer",
+      name: "Anna Smith",
+      email: "anna@deeddelivery.com",
+      bio: "Anna is a software engineer with 10 years experience in logistics and mapping.",
+      color: "#AAAAAA",
+    },
+    3: {
+      role: "Designer",
+      name: "John Lee",
+      email: "john@deeddelivery.com",
+      bio: "John leads the creative direction and UI/UX design.",
+      color: "#AAAAAA",
+    },
+    4: {
+      role: "Marketer",
+      name: "Emily Davis",
+      email: "emily@deeddelivery.com",
+      bio: "Emily drives marketing strategy and customer outreach.",
+      color: "#AAAAAA",
+    },
+
+  };
+
+  const map = document.getElementById("map");
+  const markers = document.querySelectorAll(".marker");
+  const profileCard = document.getElementById("profile-card");
+  const cardRole = document.getElementById("card-role");
+  const cardName = document.getElementById("card-name");
+  const cardEmail = document.getElementById("card-email");
+  const cardBio = document.getElementById("card-bio");
+  const paths = {
+    1: document.getElementById("path-1"),
+    2: document.getElementById("path-2"),
+    3: document.getElementById("path-3"),
+    4: document.getElementById("path-4"),
+  };
+  const deedTeam = document.getElementById("deed-team");
+
+  let activeId = null;
+
+  function getMarkerPoint(marker) {
+    const rect = marker.getBoundingClientRect();
+    return {
+      x: rect.left + rect.width / 2,
+      y: rect.top + rect.height,
+    };
+  }
+
+  function drawPath(pathEl, fromEl, toEl) {
+    const from = getMarkerPoint(fromEl);
+    const to = getMarkerPoint(toEl);
+    const svgRect = map.getBoundingClientRect();
+
+    const startX = from.x - svgRect.left;
+    const startY = from.y - svgRect.top;
+    const endX = to.x - svgRect.left;
+    const endY = to.y - svgRect.top;
+
+    const dx = Math.abs(endX - startX) * 0.3;
+    const dy = Math.abs(endY - startY) * 0.1;
+    const d = `M${startX},${startY} C${startX + dx},${startY - dy} ${endX - dx},${endY - dy} ${endX},${endY}`;
+
+    pathEl.setAttribute("d", d);
+  }
+
+  function positionCard(marker) {
+    const mapRect = map.getBoundingClientRect();
+    const cardRect = profileCard.getBoundingClientRect();
+    const markerRect = marker.getBoundingClientRect();
+
+    let top = markerRect.top - mapRect.top - cardRect.height - 10;
+    if (top < 10) top = markerRect.bottom - mapRect.top + 10;
+
+    let left = markerRect.left - mapRect.left + 20;
+    if (left + cardRect.width > mapRect.width - 10) {
+      left = markerRect.left - mapRect.left - cardRect.width - 20;
+    }
+    profileCard.style.top = `${top}px`;
+    profileCard.style.left = `${left}px`;
+  }
+  function clearActive() {
+    markers.forEach((m) => m.classList.remove("active"));
+    Object.values(paths).forEach((p) => p.classList.remove("active"));
+    profileCard.style.display = "none";
+    activeId = null;
+  }
+  function activateMember(id) {
+    if (activeId === id) return; // Already active, no change
+    clearActive();
+
+    activeId = id;
+    const marker = [...markers].find((m) => m.dataset.id === String(id));
+    if (!marker) return;
+
+    marker.classList.add("active");
+    paths[id].classList.add("active");
+
+    const mem = members[id];
+    cardRole.textContent = mem.role;
+    cardName.textContent = mem.name;
+    cardEmail.textContent = mem.email;
+    cardBio.textContent = mem.bio;
+    profileCard.style.display = "block";
+
+    positionCard(marker);
+  }
+
+  markers.forEach((marker) => {
+    marker.addEventListener("mouseenter", () => activateMember(marker.dataset.id));
+    marker.addEventListener("mouseleave", (e) => {
+      // Small timeout to allow moving to profile card
+      setTimeout(() => {
+        if (!profileCard.matches(':hover') && !marker.matches(':hover')) {
+          clearActive();
+        }
+      }, 200);
+    });
+  });
+
+  profileCard.addEventListener("mouseleave", () => {
+    setTimeout(() => {
+      if (![...markers].some(m => m.matches(':hover')) && !profileCard.matches(':hover')) {
+        clearActive();
+      }
+    }, 200);
+  });
+
+  window.addEventListener("resize", () => {
+    Object.entries(paths).forEach(([id, pathEl]) => {
+      const marker = [...markers].find((m) => m.dataset.id === id);
+      if (marker) drawPath(pathEl, marker, deedTeam);
+    });
+    if (activeId) {
+      const marker = [...markers].find((m) => m.dataset.id === activeId);
+      if (marker) positionCard(marker);
+    }
+  });
+
+  Object.entries(paths).forEach(([id, pathEl]) => {
+    const marker = [...markers].find((m) => m.dataset.id === id);
+    if (marker) drawPath(pathEl, marker, deedTeam);
+  });
+</script>
+</body>
+</html>
